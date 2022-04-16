@@ -1,0 +1,11 @@
+﻿  Main.cpp
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(11,11): warning C4244: "return": konwersja z "float" do "int", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(81,25): warning C4244: "inicjowanie": konwersja z "int" do "float", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(82,25): warning C4244: "inicjowanie": konwersja z "int" do "float", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(95,18): warning C4244: "inicjowanie": konwersja z "Uint32" do "float", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(98,12): warning C4244: "inicjowanie": konwersja z "float" do "int", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(98,23): warning C4244: "inicjowanie": konwersja z "float" do "int", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(146,26): warning C4244: "=": konwersja z "Uint32" do "float", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(169,17): warning C4244: "=": konwersja z "double" do "int", możliwa utrata danych
+C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(170,17): warning C4244: "=": konwersja z "double" do "int", możliwa utrata danych
+  FirstGame.vcxproj -> C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\x64\Debug\FirstGame.exe
