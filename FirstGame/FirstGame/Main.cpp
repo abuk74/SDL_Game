@@ -6,60 +6,121 @@
 #include "Main.h"
 
 #include <Windows.h>
- 
+
+typedef unsigned char uchar;
+
 const int screenWidth = 1920;
 const int screenHight = 1080;
 
 const int gridWidth = 15;
 const int gridHeight = 11;
 
-const char image_path[] = "space-invaders.png";
+uchar grid[gridHeight][gridWidth];
+
+const char defaultCharacterSpritePath[] = "image.png";
 
 static float deltaTime = 0.0f;
+static bool isMoving[16] = { false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
+static bool isPlayerRound = true;
+static int roundIndex = 0;
+
+
+
+#pragma region Vectors
+
 
 struct Vector2
 {
 	float x;
 	float y;
+
+	Vector2(float valueX, float valueY);
+
+	~Vector2();
 };
 
-struct Vector4 
+Vector2::Vector2(float valueX, float valueY)
 {
-	int x, y, z, w;
-	void Init(int x_value, int y_value, int z_value, int w_value);
-};
-void Vector4::Init(int x_value, int y_value, int z_value, int w_value)
-{
-	x = x_value;
-	y = y_value;
-	z = z_value;
-	w = w_value;
+	x = valueX;
+	y = valueY;
 }
 
-struct Obstacle
+Vector2::~Vector2() {};
+
+struct Vector2i
+{
+	int x;
+	int y;
+
+	Vector2i(int valueX, int valueY);
+
+	~Vector2i();
+};
+
+Vector2i::Vector2i(int valueX, int valueY)
+{
+	x = valueX;
+	y = valueY;
+}
+
+Vector2i::~Vector2i() {};
+
+struct Vector4
+{
+	float x, y, z, w;
+
+	Vector4();
+	Vector4(float valueX, float valueY, float valueZ, float valueW);
+
+	~Vector4();
+};
+
+
+Vector4::Vector4()
+{
+};
+
+Vector4::Vector4(float valueX, float valueY, float valueZ, float valueW)
+{
+	x = valueX;
+	y = valueY;
+	z = valueZ;
+	w = valueW;
+}
+
+Vector4::~Vector4() {};
+
+#pragma endregion
+
+#pragma region Image
+
+struct Image
 {
 	SDL_Texture* texture;
-	Vector2 size;
-	void Init(SDL_Texture* tex, int width, int height);
-	void Render(SDL_Renderer* renderer, float x, float y);
+	Vector2 textureSize;
+
+	Image(SDL_Texture* tex, Vector2 size);
+
+	void Render(SDL_Renderer* renderer, Vector2 position);
 	void Destroy();
+
+	~Image();
 };
- 
-void Obstacle::Init(SDL_Texture* tex, int width, int height)
+
+Image::Image(SDL_Texture* tex, Vector2 size)
+	:textureSize(size.x, size.y)
 {
 	texture = tex;
-	size.x = width;
-	size.y = height;
 }
- 
-void Obstacle::Render(SDL_Renderer* renderer, float x, float y)
+
+void Image::Render(SDL_Renderer* renderer, Vector2 position)
 {
 	SDL_Rect rect;
-	rect.x = round(x * screenWidth/gridWidth); 
-	rect.y = round(y * screenHight/gridHeight);
-	rect.w = size.x;
-	rect.h = size.y;
- 
+	rect.x = position.x * textureSize.x;
+	rect.y = position.y * textureSize.y;
+	rect.w = textureSize.x;
+	rect.h = textureSize.y;
+
 	SDL_RenderCopyEx(renderer,
 		texture,
 		nullptr,
@@ -68,135 +129,168 @@ void Obstacle::Render(SDL_Renderer* renderer, float x, float y)
 		nullptr,
 		SDL_FLIP_NONE);
 }
- 
-void Obstacle::Destroy()
+
+void Image::Destroy()
 {
 	SDL_DestroyTexture(texture);
 }
- 
-struct Player
+
+Image::~Image()
 {
-	Obstacle block;
+	Destroy();
+}
+
+#pragma endregion
+
+#pragma region Collections
+
+
+struct Node
+{
+	Node* another_node;
 	Vector2 position;
-	void Init(SDL_Texture* tex, int width, int height, float PositionX, float PositionY);
-	void Render(SDL_Renderer* renderer);
 };
- 
-void Player::Init(SDL_Texture* tex, int width, int height, float positionX, float positionY)
+
+struct Queue
 {
-	block.Init(tex, width, height);
-	position.x = positionX;
-	position.y = positionY;
-}
- 
-void Player::Render(SDL_Renderer* renderer)
-{
-	block.Render(renderer, position.x, position.y);
-}
- 
-struct List
-{
-	List* PastElement;
-	unsigned char X;
-	unsigned char Y;
-};
- 
-struct Stack
-{
-	List* LastElement = nullptr;
-	void AddElement(int x, int y);
-	void DeleteLastElement();
- 
+	void AddNode(Vector2 nodePosition);
+	bool IsEmpty();
+	void DeleteFirstNode();
 	void Clear();
+
+	Node* FirstNode = nullptr;
 };
 
-void Stack::AddElement(int x, int y)
+void Queue::DeleteFirstNode()
 {
-	List* NewElement = (List*)malloc(sizeof(List));
-	NewElement->PastElement = LastElement;
-	NewElement->X = x;
-	NewElement->Y = y;
-	LastElement = NewElement;
+	Node* next_node = FirstNode->another_node;
+	free(FirstNode);
+	FirstNode = next_node;
+
+}
+void Queue::Clear()
+{
+	while (FirstNode)
+	{
+		DeleteFirstNode();
+	}
 }
 
-void Stack::DeleteLastElement()
+void Queue::AddNode(Vector2 nodePosition)
 {
-	if (LastElement)
+	Node** last_node = &FirstNode;
+	while (*last_node)
 	{
-		List* PastElement = LastElement->PastElement;
-		free(LastElement);
-		LastElement = PastElement;
+		last_node = &(*last_node)->another_node;
+	}
+	*last_node = (Node*)malloc(sizeof(Node));
+	(*last_node)->another_node = nullptr;
+	(*last_node)->position = nodePosition;
+}
+
+
+bool Queue::IsEmpty()
+{
+	return !FirstNode;
+}
+
+#pragma endregion
+
+#pragma region Character
+
+struct Character
+{
+	Image image;
+	Vector2 position;
+	Queue path;
+	int characterIndex;
+
+	Character(SDL_Texture* tex, Vector2 size, Vector2 pos, int characterIndex);
+	void Render(SDL_Renderer* renderer);
+	void Move();
+	void MoveInit(Vector2 destination);
+
+	~Character();
+};
+
+Character::Character(SDL_Texture* tex, Vector2 size, Vector2 pos, int id)
+	:image(tex, size), position(pos.x, pos.y)
+{
+	characterIndex = id;
+}
+
+void Character::Render(SDL_Renderer* renderer)
+{
+	image.Render(renderer, position);
+}
+
+void DrawMap(uchar arr[][15])
+{
+	for (int i = 0; i < gridHeight; i++)
+	{
+		for (int j = 0; j < gridWidth; j++)
+		{
+			printf("%i\t", arr[i][j]);
+		}
+		printf("\n");
+	}
+}
+
+void Character::MoveInit(Vector2 destination)
+{
+	path = GetPathGrassfire(position, destination);
+}
+void Character::Move()
+{
+	if (!path.IsEmpty())
+	{
+		position = path.FirstNode->position;
+		path.DeleteFirstNode();
+		isMoving[characterIndex] = true;
+		Sleep(150);
 	}
 	else
-	{
-		printf("You Delete non-existent element!");
-		abort();
-	}
+		isMoving[characterIndex] = false;
 }
 
-void Stack::Clear()
-{
-	while (LastElement)
-	{
-		DeleteLastElement();
-	}
-}
+Character:: ~Character() {};
 
-SDL_Renderer* InitializeSDL(SDL_Window* window) 
+#pragma endregion
+
+#pragma region SDL
+
+bool InitializeSDL(SDL_Renderer* renderer, Vector4 backgroundColor)
 {
-	Vector4 backgroundColor;
-	backgroundColor.Init(3, 34, 48, 255);
 
 	// Init SDL libraries
 	SDL_SetMainReady(); // Just leave it be
 	int result = 0;
-	result = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO); 
-	if (result) 
+	result = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+	if (result)
 	{
-		printf("Can't initialize SDL. Error: %s", SDL_GetError()); 
-		abort();
+		printf("Can't initialize SDL. Error: %s", SDL_GetError());
+		return false;
 	}
- 
-	result = IMG_Init(IMG_INIT_PNG); 
-	if (!(result & IMG_INIT_PNG)) 
+
+	result = IMG_Init(IMG_INIT_PNG);
+	if (!(result & IMG_INIT_PNG))
 	{
 		printf("Can't initialize SDL image. Error: %s", SDL_GetError());
-		abort();
+		return false;
 	}
- 
+	SDL_SetRenderDrawColor(renderer, backgroundColor.x, backgroundColor.y, backgroundColor.z, backgroundColor.w);
+	return true;
+}
+
+SDL_Renderer* GetRenderer(SDL_Window* window)
+{
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 	if (!renderer)
 		abort();
- 
- 
-	SDL_SetRenderDrawColor(renderer, backgroundColor.x, backgroundColor.y, backgroundColor.z, backgroundColor.w);
- 
-	
-	SDL_Surface* surface = IMG_Load(image_path);
-	if (!surface)
-	{
-		printf("Unable to load an image %s. Error: %s", image_path, IMG_GetError());
-		abort();
-	}
- 
- 
-	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-	if (!texture)
-	{
-		printf("Unable to create a texture. Error: %s", SDL_GetError());
-		abort();
-	}
- 
-	// In a moment we will get rid of the surface as we no longer need that. But let's keep the image dimensions.
-	int tex_width = surface->w;
-	int tex_height = surface->h;
-
-	// Bye-bye the surface
-	SDL_FreeSurface(surface);
 	return renderer;
 }
 
- SDL_Window* GetWindow()
+SDL_Window* GetWindow()
 {
 	SDL_Window* window = SDL_CreateWindow("FirstSDL",
 		0, 0,
@@ -207,283 +301,257 @@ SDL_Renderer* InitializeSDL(SDL_Window* window)
 		abort();
 	return window;
 }
- 
-int main()
-{
-	SDL_Window* window = GetWindow();
-	SDL_Renderer* renderer = InitializeSDL(window);
- 
- 
-	int WidthPixels = 1920 / gridWidth;
-	int HeightPixels = 1080 / gridHeight;
- 
-	Vector2 currentPosition{ 7, 10 };
-	Vector2 destination = currentPosition;
-	Vector2 CurrentBlockPosition = currentPosition;
- 
-	
-	Player ship;
-	Obstacle redBlock;
-	SDL_Surface* s;
 
-	s = SDL_CreateRGBSurface(0, WidthPixels, HeightPixels, 32, 0, 0, 0, 0);
- 
-	SDL_FillRect(s, NULL, SDL_MapRGB(s->format, 255, 255, 255));
-	ship.Init(SDL_CreateTextureFromSurface(renderer, IMG_Load(image_path)), WidthPixels, HeightPixels, 7, 10);
- 
-	SDL_FillRect(s, NULL, SDL_MapRGB(s->format, 255, 0, 0));
-	redBlock.Init(SDL_CreateTextureFromSurface(renderer, s), WidthPixels, HeightPixels);
- 
-	SDL_FreeSurface(s);
- 
- 
-	unsigned char** arr = (unsigned char**)malloc(sizeof(unsigned char*) * gridHeight);
+#pragma endregion
+
+Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
+{
+	Queue search_queue, path;
+	uchar grid_copy[gridHeight][gridWidth];
 	for (int i = 0; i < gridHeight; i++)
 	{
-		arr[i] = (unsigned char*)malloc(sizeof(unsigned char) * gridWidth);
 		for (int j = 0; j < gridWidth; j++)
 		{
-			arr[i][j] = 1;
+			grid_copy[i][j] = grid[i][j];
 		}
 	}
- 
- 
-	Stack stack1, stack2;
-	Stack* currentCheck = &stack1;
-	Stack* nextCheck = &stack2;
-	Stack path;
- 
- 
-	bool finding = false;
-	bool existPath = false;
+
+	grid_copy[(int)end_pos.y][(int)end_pos.x]++;
+
+	search_queue.AddNode(end_pos);
+
+	while (!search_queue.IsEmpty() && path.IsEmpty())
+	{
+		const Vector2 current_pos = search_queue.FirstNode->position;
+		search_queue.DeleteFirstNode();
+
+		uchar next_value = grid_copy[(int)current_pos.y][(int)current_pos.x] + 1;
+
+		for (int i = -1; i <= 1; i++)
+		{
+			for (int j = -1; j <= 1; j++)
+			{
+				if (i != j && i * j == 0)
+				{
+					Vector2 neighbour = { current_pos.x + j, current_pos.y + i };
+					if ((int)neighbour.x == (int)start_pos.x && (int)neighbour.y == (int)start_pos.y)
+					{
+						path.AddNode(neighbour);
+						grid_copy[(int)neighbour.y][(int)neighbour.x] = next_value;
+					}
+					else if (neighbour.y > 0 && neighbour.y < gridHeight && neighbour.x > 0 && neighbour.x < gridWidth &&
+						grid_copy[(int)neighbour.y][(int)neighbour.x] == grid[(int)neighbour.y][(int)neighbour.x] && grid_copy[(int)neighbour.y][(int)neighbour.x] != 255)
+					{
+						search_queue.AddNode(neighbour); // add point to check-list 
+						grid_copy[(int)neighbour.y][(int)neighbour.x] = next_value;
+					}
+				}
+			}
+		}
+	}
+
+	search_queue.Clear();
+	DrawMap(grid_copy);
+
+	if (!path.IsEmpty())
+	{
+
+		Vector2 current_pos = path.FirstNode->position;
+		int next_value = grid_copy[(int)current_pos.y][(int)current_pos.x] - 1;
+		while (next_value > grid_copy[(int)end_pos.y][(int)end_pos.x])
+		{
+			for (int i = -1; i <= 1; i++)
+				for (int j = -1; j <= 1; j++)
+					if (i * j == 0 && i != j)
+					{
+						Vector2 neighbour{ current_pos.x + i, current_pos.y + j };
+						if (neighbour.x >= 0 && neighbour.y >= 0 && neighbour.x < gridWidth && neighbour.y < gridHeight)
+						{
+							if (grid_copy[(int)neighbour.y][(int)neighbour.x] == next_value)
+							{
+								path.AddNode(neighbour);
+								current_pos = neighbour;
+								next_value--;
+							}
+						}
+					}
+		}
+		path.AddNode(end_pos);
+	}
+	return path;
+}
+
+Vector2 CastToGridPosition(Vector2 mousePosition)
+{
+	return Vector2(mousePosition.x / (screenWidth / gridWidth), mousePosition.y / (screenHight / gridHeight));
+}
+
+int GetRandomIndex(int value)
+{
+	int random = rand() % value;
+	return random;
+}
+
+Vector2i GetRandomGrid()
+{
+	int randomX = GetRandomIndex(gridWidth);
+	int randomY = GetRandomIndex(gridHeight);
+	if (grid[randomX][randomY] != 255)
+	{
+		Vector2i vector = { randomX, randomY };
+		return vector;
+	}
+	else
+		GetRandomGrid();
+}
+
+bool IsMoving()
+{
+	for (int i = 0; i < 16; i++)
+	{
+		if (isMoving[i])
+			return true;
+	}
+	return false;
+}
+
+int main()
+{
+	Vector4 backgroundColor = Vector4(3, 34, 48, 255);
+
+	SDL_Window* window = GetWindow();
+	SDL_Renderer* renderer = GetRenderer(window);
+	if (!InitializeSDL(renderer, backgroundColor))
+		return -1;
+
+	Vector2 screenSize(screenWidth / gridWidth, screenHight / gridHeight);
+
+	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 3), 0);
+	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 4), 1);
+	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 5), 2);
+	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 6), 3);
+	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 7), 4);
+	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 8), 5);
+	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 9), 6);
+	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 10), 7);
+
+	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 2), 8);
+	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 3), 9);
+	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 4), 10);
+	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 5), 11);
+	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 6), 12);
+	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 7), 13);
+	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 8), 14);
+	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 9), 15);
+
+	int amountPlayer = 8;
+	int amountAI = 8;
+	int playerIndex = 0;
+	int AIIndex = 0;
+
+	Character* playerChampions[8] = { &championA, &championB , &championC ,&championD ,&championE ,&championF ,&championG ,&championH };
+	Character* agents[8] = { &championAIA, &championAIB ,&championAIC ,&championAID ,&championAIE ,&championAIF ,&championAIG, &championAIH };
+
+
+	Image obstacleA = Image(SDL_CreateTextureFromSurface(renderer, IMG_Load("obstacle.png")), screenSize);
+	Image obstacleB = Image(SDL_CreateTextureFromSurface(renderer, IMG_Load("obstacle.png")), screenSize);
+	Image obstacleC = Image(SDL_CreateTextureFromSurface(renderer, IMG_Load("obstacle.png")), screenSize);
+	Image obstacleD = Image(SDL_CreateTextureFromSurface(renderer, IMG_Load("obstacle.png")), screenSize);
+
+	Image* obstacles[4] = { &obstacleA, &obstacleB, &obstacleC, &obstacleD };
+
+	Vector2i obstacleAPos = GetRandomGrid();
+	grid[obstacleAPos.y][obstacleAPos.x] = 255;
+
+	Vector2i obstacleBPos = GetRandomGrid();
+	grid[obstacleBPos.y][obstacleBPos.x] = 255;
+
+	Vector2i obstacleCPos = GetRandomGrid();
+	grid[obstacleCPos.y][obstacleCPos.x] = 255;
+
+	Vector2i obstacleDPos = GetRandomGrid();
+	grid[obstacleDPos.y][obstacleDPos.x] = 255;
+
 	bool done = false;
-	SDL_Event sdl_event;
-	
+	SDL_Event sdlEvent;
+
 	float startTime = SDL_GetTicks();
 	float lastTime = startTime;
+
+	Queue path;
 
 	while (!done)
 	{
 		startTime = lastTime;
 		// Polling the messages from the OS.
 		// That could be key downs, mouse movement, ALT+F4 or many others
-		while (SDL_PollEvent(&sdl_event))
+		while (SDL_PollEvent(&sdlEvent))
 		{
-			ProcessEvents(sdl_event, done, currentCheck, ship, destination, WidthPixels, HeightPixels, arr, finding);
+			ProcessEvents(&sdlEvent, &done, playerChampions[playerIndex % amountPlayer], &playerIndex);
 		}
- 
+
+		for (int i = 0; i < 8; i++)
+		{
+			playerChampions[i]->Move();
+			agents[i]->Move();
+		}
+
+
+		if (!isPlayerRound && !IsMoving())
+		{
+			Vector2i dest = GetRandomGrid();
+			agents[AIIndex % amountAI]->MoveInit(Vector2(dest.x, dest.y));
+			AIIndex++;
+			isPlayerRound = true;
+		}
+
+
+
 		// Clearing the screen
 		SDL_RenderClear(renderer);
- 
-		DrawObstacles(arr, redBlock, renderer);
- 
- 
-		while (finding && !existPath)
+
+
+		for (int i = 0; i < 8; i++)
 		{
-			FindPath(currentCheck, arr, nextCheck, path, existPath);
-
-			currentCheck->DeleteLastElement();
-			if (!currentCheck->LastElement)
-			{
-				Stack* temp = currentCheck;
-				currentCheck = nextCheck;
-				nextCheck = temp;
-			}
- 
-			while (existPath)
-			{
-				unsigned char x = path.LastElement->X;
-				unsigned char y = path.LastElement->Y;
-				if (x - 1 >= 0 && arr[y][x - 1] == arr[y][x] - 1)
-				{
-					path.AddElement(x - 1, y);
-				}
-				else if (x + 1 < gridWidth && arr[y][x + 1] == arr[y][x] - 1)
-				{
-					path.AddElement(x + 1, y);
-				}
-				else if (y - 1 >= 0 && arr[y - 1][x] == arr[y][x] - 1)
-				{
-					path.AddElement(x, y - 1);
-				}
-				else if (y + 1 < gridHeight && arr[y + 1][x] == arr[y][x] - 1)
-				{
-					path.AddElement(x, y + 1);
-				}
-				if (arr[y][x] == 3)
-				{
-					for (int i = 0; i < gridHeight; i++)
-					{
-						for (int j = 0; j < gridWidth; j++)
-						{
-							arr[i][j] = 1;
-						}
-					}
-					currentCheck->Clear();
-					nextCheck->Clear();
-					finding = false;
-					existPath = false;
-					break;
-				}
-			}
+			playerChampions[i]->Render(renderer);
+			agents[i]->Render(renderer);
 		}
-		
-		deltaTime = (lastTime - startTime);
-		if (path.LastElement)
-		{
-			ship.position.x = path.LastElement->X;
 
-			//MoveTo(ship, path, renderer);
+		obstacleA.Render(renderer, Vector2(obstacleAPos.x, obstacleAPos.y));
+		obstacleB.Render(renderer, Vector2(obstacleBPos.x, obstacleBPos.y));
+		obstacleC.Render(renderer, Vector2(obstacleCPos.x, obstacleCPos.y));
+		obstacleD.Render(renderer, Vector2(obstacleDPos.x, obstacleDPos.y));
 
-
-
-			ship.position.y = path.LastElement->Y;
-
-
-
-			path.DeleteLastElement();
-			Sleep(100);
-
-		}
- 
-		ship.Render(renderer);
-// Showing the screen to the player
+		// Showing the screen to the player
 		SDL_RenderPresent(renderer);
- 
+
 		// next frame...
 	}
- 
-	// If we reached here then the main loop stoped
-	// That means the game wants to quit
-	for (int i = 0; i < gridHeight; i++)
-	{
-		free(arr[i]);
-	}
- 
-	free(arr);
- 
-	redBlock.Destroy();
 	// Shutting down the renderer
 	SDL_DestroyRenderer(renderer);
- 
+
 	// Shutting down the window
 	SDL_DestroyWindow(window);
- 
+
 	// Quitting the Image SDL library
 	IMG_Quit();
 	// Quitting the main SDL library
 	SDL_Quit();
- 
+
 	// Done.
 	return 0;
 }
 
-void MoveTo(Player& ship, Stack& path, SDL_Renderer* renderer)
+
+void ProcessEvents(SDL_Event* event, bool* done, Character* player, int* PIndex)
 {
-	while (ship.position.x < path.LastElement->X || ship.position.x > path.LastElement->X || ship.position.y < path.LastElement->Y || ship.position.y > path.LastElement->Y)
+	if (event->type == SDL_QUIT) // The user wants to quit
 	{
-	if (ship.position.x < path.LastElement->X)
-		ship.position.x = ship.position.x + 5.0f ;
-	else if (ship.position.x > path.LastElement->X)
-		ship.position.x = ship.position.x - 5.0f ;
-	if (ship.position.y < path.LastElement->Y)
-		ship.position.y = ship.position.y + 5.0f;
-	else if (ship.position.y > path.LastElement->Y)
-		ship.position.y = ship.position.y - 5.0f;
-
-	Sleep(100);
-	ship.Render(renderer);
+		*done = true;
 	}
-}
-
-void FindPath(Stack* currentCheck, unsigned char** arr, Stack* nextCheck, Stack& path, bool& PathGenerate)
-{
-	unsigned char x = currentCheck->LastElement->X;
-	unsigned char y = currentCheck->LastElement->Y;
-	if (x - 1 >= 0 && (arr[y][x - 1] == 1 || arr[y][x - 1] == 255))		// LEFT POINT
+	else if (event->type == SDL_KEYDOWN) // A key was pressed
 	{
-		if (arr[y][x - 1] != 255)
-		{
-			arr[y][x - 1] = arr[y][x] + 1;
-			nextCheck->AddElement(x - 1, y);
-		}
-		else
-		{
-			arr[y][x - 1] = arr[y][x] + 1;
-			path.AddElement(x - 1, y);
-			PathGenerate = true;
-		}
-	}
-
-
-	if (y - 1 >= 0 && (arr[y - 1][x] == 1 || arr[y - 1][x] == 255))		//UP POINT
-	{
-		if (arr[y - 1][x] != 255)
-		{
-			arr[y - 1][x] = arr[y][x] + 1;
-			nextCheck->AddElement(x, y - 1);
-		}
-		else
-		{
-			arr[y - 1][x] = arr[y][x] + 1;
-			path.AddElement(x, y - 1);
-			PathGenerate = true;
-		}
-
-	}
-
-	if (x + 1 < gridWidth && (arr[y][x + 1] == 1 || arr[y][x + 1] == 255))			//RIGTH POINT
-	{
-		if (arr[y][x + 1] != 255)
-		{
-			arr[y][x + 1] = arr[y][x] + 1;
-			nextCheck->AddElement(x + 1, y);
-		}
-		else
-		{
-			arr[y][x + 1] = arr[y][x] + 1;
-			path.AddElement(x + 1, y);
-			PathGenerate = true;
-		}
-	}
-
-	if (y + 1 < gridHeight && (arr[y + 1][x] == 1 || arr[y + 1][x] == 255))		//DOWN POINT
-	{
-		if (arr[y + 1][x])
-		{
-			if (arr[y + 1][x] != 255)
-			{
-				arr[y + 1][x] = arr[y][x] + 1;
-				nextCheck->AddElement(x, y + 1);
-			}
-			else
-			{
-				arr[y + 1][x] = arr[y][x] + 1;
-				path.AddElement(x, y + 1);
-				PathGenerate = true;
-			}
-		}
-	}
-}
-
-void DrawObstacles(unsigned char** arr, Obstacle& RedBlock, SDL_Renderer* renderer)
-{
-	for (int i = 1; i < gridWidth - 1; i++)
-	{
-		arr[gridHeight / 2][i] = 0;
-		RedBlock.Render(renderer, i, gridHeight / 2);
-	}
-}
-
-void ProcessEvents(SDL_Event& sdl_event, bool& done, Stack* CheckNow, Player& Ship, Vector2& GoalPosition, int WidthPixels, int HeightPixels, unsigned char** arr, bool& finding)
-{
-	if (sdl_event.type == SDL_QUIT) // The user wants to quit
-	{
-		done = true;
-	}
-	else if (sdl_event.type == SDL_KEYDOWN) // A key was pressed
-	{
-		switch (sdl_event.key.keysym.sym) // Which key?
+		switch (event->key.keysym.sym) // Which key?
 		{
 		case SDLK_ESCAPE: // Posting a quit message to the OS queue so it gets processed on the next step and closes the game
 			SDL_Event event;
@@ -496,20 +564,20 @@ void ProcessEvents(SDL_Event& sdl_event, bool& done, Stack* CheckNow, Player& Sh
 			break;
 		}
 	}
-	else if (sdl_event.type == SDL_MOUSEBUTTONDOWN)
+	else if (event->type == SDL_MOUSEBUTTONDOWN)
 	{
-		switch (sdl_event.button.button)
+		switch (event->button.button)
 		{
 		case SDL_BUTTON_LEFT:
 		{
-			int x, y;
-			SDL_GetMouseState(&x, &y);
-			CheckNow->AddElement((int)Ship.position.x, (int)Ship.position.y);
-			GoalPosition.x = (int)(x / WidthPixels);
-			GoalPosition.y = (int)(y / HeightPixels);
-			arr[(int)Ship.position.y][(int)Ship.position.x] = 2;
-			arr[(int)GoalPosition.y][(int)GoalPosition.x] = 255;
-			finding = true;
+			if (!IsMoving() && isPlayerRound)
+			{
+				int x, y;
+				SDL_GetMouseState(&x, &y);
+				player->MoveInit(CastToGridPosition(Vector2(x, y)));
+				*PIndex += 1;
+				isPlayerRound = false;
+			}
 			break;
 		}
 		default:
