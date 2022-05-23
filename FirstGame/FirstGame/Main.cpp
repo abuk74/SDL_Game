@@ -321,31 +321,31 @@ SDL_Window* GetWindow()
 
 #pragma endregion
 
-Queue GetPathGrassfire(Vector2i start_pos, Vector2i end_pos)
+Queue GetPathGrassfire(Vector2i startPos, Vector2i endPos)
 {
-	Queue search_queue, path;
-	uchar grid_copy[gridHeight][gridWidth];
+	Queue searchQueue, path;
+	uchar gridCopy[gridHeight][gridWidth];
 	for (int i = 0; i < gridHeight; i++)
 	{
 		for (int j = 0; j < gridWidth; j++)
 		{
-			grid_copy[i][j] = grid[i][j];
+			gridCopy[i][j] = grid[i][j];
 		}
 	}
 
-	if (grid[end_pos.y][end_pos.x] == 255)
+	if (grid[endPos.y][endPos.x] == 255)
 		return path;
 
-	grid_copy[(int)end_pos.y][(int)end_pos.x]++;
+	gridCopy[endPos.y][endPos.x]++;
 
-	search_queue.AddNode(end_pos);
+	searchQueue.AddNode(endPos);
 
-	while (!search_queue.IsEmpty() && path.IsEmpty())
+	while (!searchQueue.IsEmpty() && path.IsEmpty())
 	{
-		const Vector2i current_pos = search_queue.FirstNode->position;
-		search_queue.DeleteFirstNode();
+		const Vector2i currentPosition = searchQueue.FirstNode->position;
+		searchQueue.DeleteFirstNode();
 
-		uchar next_value = grid_copy[(int)current_pos.y][(int)current_pos.x] + 1;
+		uchar next_value = gridCopy[currentPosition.y][currentPosition.x] + 1;
 
 		for (int i = -1; i <= 1; i++)
 		{
@@ -353,50 +353,50 @@ Queue GetPathGrassfire(Vector2i start_pos, Vector2i end_pos)
 			{
 				if (i != j && i * j == 0)
 				{
-					Vector2i neighbour = { current_pos.x + j, current_pos.y + i };
-					if ((int)neighbour.x == (int)start_pos.x && (int)neighbour.y == (int)start_pos.y)
+					Vector2i neighbour = { currentPosition.x + j, currentPosition.y + i };
+					if (neighbour.x == startPos.x && neighbour.y == startPos.y)
 					{
 						path.AddNode(neighbour);
-						grid_copy[(int)neighbour.y][(int)neighbour.x] = next_value;
+						gridCopy[neighbour.y][neighbour.x] = next_value;
 					}
 					else if (neighbour.y > 0 && neighbour.y < gridHeight && neighbour.x > 0 && neighbour.x < gridWidth &&
-						grid_copy[(int)neighbour.y][(int)neighbour.x] == grid[(int)neighbour.y][(int)neighbour.x] && grid_copy[(int)neighbour.y][(int)neighbour.x] != 255)
+						gridCopy[neighbour.y][neighbour.x] == grid[neighbour.y][(int)neighbour.x] && gridCopy[neighbour.y][neighbour.x] != 255)
 					{
-						search_queue.AddNode(neighbour); // add point to check-list 
-						grid_copy[(int)neighbour.y][(int)neighbour.x] = next_value;
+						searchQueue.AddNode(neighbour); // add point to check-list 
+						gridCopy[neighbour.y][neighbour.x] = next_value;
 					}
 				}
 			}
 		}
 	}
 
-	search_queue.Clear();
-	DrawMap(grid_copy);
+	searchQueue.Clear();
+	DrawMap(gridCopy);
 
 	if (!path.IsEmpty())
 	{
 
-		Vector2i current_pos = path.FirstNode->position;
-		int next_value = grid_copy[(int)current_pos.y][(int)current_pos.x] - 1;
-		while (next_value > grid_copy[(int)end_pos.y][(int)end_pos.x])
+		Vector2i currentPos = path.FirstNode->position;
+		int next_value = gridCopy[currentPos.y][currentPos.x] - 1;
+		while (next_value > gridCopy[endPos.y][endPos.x])
 		{
 			for (int i = -1; i <= 1; i++)
 				for (int j = -1; j <= 1; j++)
 					if (i * j == 0 && i != j)
 					{
-						Vector2i neighbour{ current_pos.x + i, current_pos.y + j };
+						Vector2i neighbour{ currentPos.x + i, currentPos.y + j };
 						if (neighbour.x >= 0 && neighbour.y >= 0 && neighbour.x < gridWidth && neighbour.y < gridHeight)
 						{
-							if (grid_copy[(int)neighbour.y][(int)neighbour.x] == next_value)
+							if (gridCopy[neighbour.y][neighbour.x] == next_value)
 							{
 								path.AddNode(neighbour);
-								current_pos = neighbour;
+								currentPos = neighbour;
 								next_value--;
 							}
 						}
 					}
 		}
-		path.AddNode(end_pos);
+		path.AddNode(endPos);
 	}
 	return path;
 }
