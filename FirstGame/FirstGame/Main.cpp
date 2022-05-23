@@ -24,6 +24,9 @@ static bool isMoving[16] = { false, false, false, false, false, false, false, fa
 static bool isPlayerRound = true;
 static int roundIndex = 0;
 
+static int alivePlayerCharactersCount = 8;
+static int aliveAgentsCount = 8;
+
 
 
 #pragma region Vectors
@@ -203,20 +206,29 @@ struct Character
 	Vector2i position;
 	Queue path;
 	int characterIndex;
+	float health;
+	float damage;
+	bool isDead = false;
+	bool AI = false;
 
-	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex);
+	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex, float health, float damage, bool isAgent);
 	void Render(SDL_Renderer* renderer);
 	void Move();
 	void MoveInit(Vector2i destination);
 	void MarkAsObstacle(bool value);
+	void TakeDamage(float damge);
+	void Die();
 
 	~Character();
 };
 
-Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id)
+Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, float startHealth, float baseDamage,  bool isAgent)
 	:image(tex, size), position(pos.x, pos.y)
 {
 	characterIndex = id;
+	health = startHealth;
+	damage = baseDamage;
+	AI = isAgent;
 	MarkAsObstacle(true);
 }
 
@@ -268,6 +280,24 @@ void Character::MarkAsObstacle(bool isObstacle)
 	{
 		grid[position.y][position.x] = 0;
 	}
+}
+
+void Character::TakeDamage(float damage) 
+{
+	if (isDead)
+		return;
+	float tempHealth = health - damage;
+	if (health <= 0.0f)
+		this->Die();
+}
+
+void Character::Die() 
+{
+	isDead = true;
+	if (AI)
+		aliveAgentsCount--;
+	else
+		alivePlayerCharactersCount--;
 }
 
 Character:: ~Character() {};
@@ -434,6 +464,11 @@ bool IsMoving()
 	return false;
 }
 
+float CalculateDamage(Character* character, int characterCount) 
+{
+	return character->damage * characterCount;
+}
+
 int main()
 {
 	Vector4 backgroundColor = Vector4(3, 34, 48, 255);
@@ -445,23 +480,23 @@ int main()
 
 	Vector2i screenSize(screenWidth / gridWidth, screenHight / gridHeight);
 
-	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0);
-	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1);
-	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2);
-	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3);
-	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4);
-	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5);
-	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6);
-	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7);
+	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0, 10.0f, 5.0f, false);
+	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1, 10.0f, 5.0f, false);
+	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2, 10.0f, 5.0f, false);
+	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3, 10.0f, 5.0f, false);
+	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4, 10.0f, 5.0f, false);
+	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5, 10.0f, 5.0f, false);
+	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6, 10.0f, 5.0f, false);
+	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7, 10.0f, 5.0f, false);
 
-	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 2), 8);
-	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 3), 9);
-	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 4), 10);
-	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 5), 11);
-	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 6), 12);
-	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 7), 13);
-	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 8), 14);
-	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 9), 15);
+	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 2), 8, 10.0f, 3.0f, true);
+	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 3), 9, 10.0f, 3.0f, true);
+	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 4), 10, 10.0f, 3.0f, true);
+	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 5), 11, 10.0f, 3.0f, true);
+	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 6), 12, 10.0f, 3.0f, true);
+	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 7), 13, 10.0f, 3.0f, true);
+	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 8), 14, 10.0f, 3.0f, true);
+	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 9), 15, 10.0f, 3.0f, true);
 
 	int amountPlayer = 8;
 	int amountAI = 8;
