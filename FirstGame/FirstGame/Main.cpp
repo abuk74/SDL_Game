@@ -28,7 +28,6 @@ static int roundIndex = 0;
 
 #pragma region Vectors
 
-
 struct Vector2
 {
 	float x;
@@ -97,23 +96,23 @@ Vector4::~Vector4() {};
 struct Image
 {
 	SDL_Texture* texture;
-	Vector2 textureSize;
+	Vector2i textureSize;
 
-	Image(SDL_Texture* tex, Vector2 size);
+	Image(SDL_Texture* tex, Vector2i size);
 
-	void Render(SDL_Renderer* renderer, Vector2 position);
+	void Render(SDL_Renderer* renderer, Vector2i position);
 	void Destroy();
 
 	~Image();
 };
 
-Image::Image(SDL_Texture* tex, Vector2 size)
+Image::Image(SDL_Texture* tex, Vector2i size)
 	:textureSize(size.x, size.y)
 {
 	texture = tex;
 }
 
-void Image::Render(SDL_Renderer* renderer, Vector2 position)
+void Image::Render(SDL_Renderer* renderer, Vector2i position)
 {
 	SDL_Rect rect;
 	rect.x = position.x * textureSize.x;
@@ -148,12 +147,12 @@ Image::~Image()
 struct Node
 {
 	Node* another_node;
-	Vector2 position;
+	Vector2i position;
 };
 
 struct Queue
 {
-	void AddNode(Vector2 nodePosition);
+	void AddNode(Vector2i nodePosition);
 	bool IsEmpty();
 	void DeleteFirstNode();
 	void Clear();
@@ -176,7 +175,7 @@ void Queue::Clear()
 	}
 }
 
-void Queue::AddNode(Vector2 nodePosition)
+void Queue::AddNode(Vector2i nodePosition)
 {
 	Node** last_node = &FirstNode;
 	while (*last_node)
@@ -201,22 +200,24 @@ bool Queue::IsEmpty()
 struct Character
 {
 	Image image;
-	Vector2 position;
+	Vector2i position;
 	Queue path;
 	int characterIndex;
 
-	Character(SDL_Texture* tex, Vector2 size, Vector2 pos, int characterIndex);
+	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex);
 	void Render(SDL_Renderer* renderer);
 	void Move();
-	void MoveInit(Vector2 destination);
+	void MoveInit(Vector2i destination);
+	void MarkAsObstacle(bool value);
 
 	~Character();
 };
 
-Character::Character(SDL_Texture* tex, Vector2 size, Vector2 pos, int id)
+Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id)
 	:image(tex, size), position(pos.x, pos.y)
 {
 	characterIndex = id;
+	MarkAsObstacle(true);
 }
 
 void Character::Render(SDL_Renderer* renderer)
@@ -236,7 +237,7 @@ void DrawMap(uchar arr[][15])
 	}
 }
 
-void Character::MoveInit(Vector2 destination)
+void Character::MoveInit(Vector2i destination)
 {
 	path = GetPathGrassfire(position, destination);
 }
@@ -244,13 +245,29 @@ void Character::Move()
 {
 	if (!path.IsEmpty())
 	{
+		MarkAsObstacle(false);
 		position = path.FirstNode->position;
 		path.DeleteFirstNode();
 		isMoving[characterIndex] = true;
 		Sleep(150);
 	}
 	else
+	{
 		isMoving[characterIndex] = false;
+		MarkAsObstacle(true);
+	}
+}
+
+void Character::MarkAsObstacle(bool isObstacle)
+{
+	if (isObstacle)
+	{
+		grid[position.y][position.x] = 255;
+	}
+	else
+	{
+		grid[position.y][position.x] = 0;
+	}
 }
 
 Character:: ~Character() {};
@@ -304,7 +321,7 @@ SDL_Window* GetWindow()
 
 #pragma endregion
 
-Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
+Queue GetPathGrassfire(Vector2i start_pos, Vector2i end_pos)
 {
 	Queue search_queue, path;
 	uchar grid_copy[gridHeight][gridWidth];
@@ -316,13 +333,16 @@ Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
 		}
 	}
 
+	if (grid[end_pos.y][end_pos.x] == 255)
+		return path;
+
 	grid_copy[(int)end_pos.y][(int)end_pos.x]++;
 
 	search_queue.AddNode(end_pos);
 
 	while (!search_queue.IsEmpty() && path.IsEmpty())
 	{
-		const Vector2 current_pos = search_queue.FirstNode->position;
+		const Vector2i current_pos = search_queue.FirstNode->position;
 		search_queue.DeleteFirstNode();
 
 		uchar next_value = grid_copy[(int)current_pos.y][(int)current_pos.x] + 1;
@@ -333,7 +353,7 @@ Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
 			{
 				if (i != j && i * j == 0)
 				{
-					Vector2 neighbour = { current_pos.x + j, current_pos.y + i };
+					Vector2i neighbour = { current_pos.x + j, current_pos.y + i };
 					if ((int)neighbour.x == (int)start_pos.x && (int)neighbour.y == (int)start_pos.y)
 					{
 						path.AddNode(neighbour);
@@ -356,7 +376,7 @@ Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
 	if (!path.IsEmpty())
 	{
 
-		Vector2 current_pos = path.FirstNode->position;
+		Vector2i current_pos = path.FirstNode->position;
 		int next_value = grid_copy[(int)current_pos.y][(int)current_pos.x] - 1;
 		while (next_value > grid_copy[(int)end_pos.y][(int)end_pos.x])
 		{
@@ -364,7 +384,7 @@ Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
 				for (int j = -1; j <= 1; j++)
 					if (i * j == 0 && i != j)
 					{
-						Vector2 neighbour{ current_pos.x + i, current_pos.y + j };
+						Vector2i neighbour{ current_pos.x + i, current_pos.y + j };
 						if (neighbour.x >= 0 && neighbour.y >= 0 && neighbour.x < gridWidth && neighbour.y < gridHeight)
 						{
 							if (grid_copy[(int)neighbour.y][(int)neighbour.x] == next_value)
@@ -381,9 +401,9 @@ Queue GetPathGrassfire(Vector2 start_pos, Vector2 end_pos)
 	return path;
 }
 
-Vector2 CastToGridPosition(Vector2 mousePosition)
+Vector2i CastToGridPosition(Vector2i mousePosition)
 {
-	return Vector2(mousePosition.x / (screenWidth / gridWidth), mousePosition.y / (screenHight / gridHeight));
+	return Vector2i(mousePosition.x / (screenWidth / gridWidth), mousePosition.y / (screenHight / gridHeight));
 }
 
 int GetRandomIndex(int value)
@@ -396,13 +416,12 @@ Vector2i GetRandomGrid()
 {
 	int randomX = GetRandomIndex(gridWidth);
 	int randomY = GetRandomIndex(gridHeight);
-	if (grid[randomX][randomY] != 255)
+	while (grid[randomY][randomX] == 255)
 	{
-		Vector2i vector = { randomX, randomY };
-		return vector;
+		randomX = GetRandomIndex(gridWidth);
+		randomY = GetRandomIndex(gridHeight);
 	}
-	else
-		GetRandomGrid();
+	return Vector2i(randomX, randomY);
 }
 
 bool IsMoving()
@@ -424,25 +443,25 @@ int main()
 	if (!InitializeSDL(renderer, backgroundColor))
 		return -1;
 
-	Vector2 screenSize(screenWidth / gridWidth, screenHight / gridHeight);
+	Vector2i screenSize(screenWidth / gridWidth, screenHight / gridHeight);
 
-	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 3), 0);
-	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 4), 1);
-	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 5), 2);
-	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 6), 3);
-	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 7), 4);
-	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 8), 5);
-	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 9), 6);
-	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(0, 10), 7);
+	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0);
+	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1);
+	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2);
+	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3);
+	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4);
+	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5);
+	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6);
+	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7);
 
-	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 2), 8);
-	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 3), 9);
-	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 4), 10);
-	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 5), 11);
-	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 6), 12);
-	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 7), 13);
-	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 8), 14);
-	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2(14, 9), 15);
+	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 2), 8);
+	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 3), 9);
+	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 4), 10);
+	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 5), 11);
+	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 6), 12);
+	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 7), 13);
+	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 8), 14);
+	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 9), 15);
 
 	int amountPlayer = 8;
 	int amountAI = 8;
@@ -500,7 +519,7 @@ int main()
 		if (!isPlayerRound && !IsMoving())
 		{
 			Vector2i dest = GetRandomGrid();
-			agents[AIIndex % amountAI]->MoveInit(Vector2(dest.x, dest.y));
+			agents[AIIndex % amountAI]->MoveInit(dest);
 			AIIndex++;
 			isPlayerRound = true;
 		}
@@ -517,10 +536,10 @@ int main()
 			agents[i]->Render(renderer);
 		}
 
-		obstacleA.Render(renderer, Vector2(obstacleAPos.x, obstacleAPos.y));
-		obstacleB.Render(renderer, Vector2(obstacleBPos.x, obstacleBPos.y));
-		obstacleC.Render(renderer, Vector2(obstacleCPos.x, obstacleCPos.y));
-		obstacleD.Render(renderer, Vector2(obstacleDPos.x, obstacleDPos.y));
+		obstacleA.Render(renderer, Vector2i(obstacleAPos.x, obstacleAPos.y));
+		obstacleB.Render(renderer, Vector2i(obstacleBPos.x, obstacleBPos.y));
+		obstacleC.Render(renderer, Vector2i(obstacleCPos.x, obstacleCPos.y));
+		obstacleD.Render(renderer, Vector2i(obstacleDPos.x, obstacleDPos.y));
 
 		// Showing the screen to the player
 		SDL_RenderPresent(renderer);
@@ -574,7 +593,7 @@ void ProcessEvents(SDL_Event* event, bool* done, Character* player, int* PIndex)
 			{
 				int x, y;
 				SDL_GetMouseState(&x, &y);
-				player->MoveInit(CastToGridPosition(Vector2(x, y)));
+				player->MoveInit(CastToGridPosition(Vector2i(x, y)));
 				*PIndex += 1;
 				isPlayerRound = false;
 			}
