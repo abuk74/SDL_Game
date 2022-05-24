@@ -4,6 +4,7 @@
 #define SDL_MAIN_HANDLED
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
+#include "SDL2/SDL_ttf.h"
 #include "Main.h"
 
 #include <Windows.h>
@@ -16,9 +17,12 @@ const int screenHight = 1080;
 const int gridWidth = 15;
 const int gridHeight = 11;
 
+const int fontSize = 42;
+
 uchar grid[gridHeight][gridWidth];
 
 const char defaultCharacterSpritePath[] = "image.png";
+const char fontPath[] = "OdibeeSans-Regular.ttf";
 
 static float deltaTime = 0.0f;
 static bool isMoving[16] = { false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
@@ -256,6 +260,8 @@ void Character::MoveInit(Vector2i destination)
 }
 void Character::Move()
 {
+	if (isDead)
+		return;
 	if (!path.IsEmpty())
 	{
 		MarkAsObstacle(false);
@@ -327,6 +333,7 @@ bool InitializeSDL(SDL_Renderer* renderer, Vector4 backgroundColor)
 		return false;
 	}
 	SDL_SetRenderDrawColor(renderer, backgroundColor.x, backgroundColor.y, backgroundColor.z, backgroundColor.w);
+
 	return true;
 }
 
@@ -348,6 +355,17 @@ SDL_Window* GetWindow()
 	if (!window)
 		abort();
 	return window;
+}
+
+TTF_Font* GetFont() 
+{
+	if (TTF_Init() < 0)
+		abort();
+	TTF_Font* font = TTF_OpenFont(fontPath, fontSize);
+	if (font)
+		return font;
+	else
+		abort();
 }
 
 #pragma endregion
@@ -477,8 +495,15 @@ int main()
 
 	SDL_Window* window = GetWindow();
 	SDL_Renderer* renderer = GetRenderer(window);
+	SDL_Texture* textTexture;
+	SDL_Surface* textSurface;
+	TTF_Font* font = GetFont();
+
 	if (!InitializeSDL(renderer, backgroundColor))
 		return -1;
+
+	textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
+	textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
 
 	Vector2i screenSize(screenWidth / gridWidth, screenHight / gridHeight);
 
@@ -539,11 +564,12 @@ int main()
 	while (!done)
 	{
 		startTime = lastTime;
+
 		// Polling the messages from the OS.
 		// That could be key downs, mouse movement, ALT+F4 or many others
 		while (SDL_PollEvent(&sdlEvent))
 		{
-			ProcessEvents(&sdlEvent, &done, playerChampions[playerIndex % amountPlayer], &playerIndex);
+			ProcessEvents(&sdlEvent, &done, playerChampions, &playerIndex, amountPlayer);
 		}
 
 		for (int i = 0; i < 8; i++)
@@ -553,8 +579,11 @@ int main()
 		}
 
 
-		if (!isPlayerRound && !IsMoving())
+		if (!isPlayerRound && !IsMoving() && aliveAgentsCount > 0)
 		{
+			while (aliveAgentsCount > 0 && agents[AIIndex % amountAI]->isDead)
+				AIIndex++;
+
 			Vector2i dest = GetRandomGrid();
 			agents[AIIndex % amountAI]->MoveInit(dest);
 			AIIndex++;
@@ -573,6 +602,16 @@ int main()
 			agents[i]->Render(renderer);
 		}
 
+		textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
+		textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+		SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
+		SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+
+		textSurface = TTF_RenderText_Solid(font, "Alive Agents: ", { 255, 255, 255 });
+		textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+		dest = { 1600, 0, textSurface->w, textSurface->h };
+		SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+
 		obstacleA.Render(renderer, Vector2i(obstacleAPos.x, obstacleAPos.y));
 		obstacleB.Render(renderer, Vector2i(obstacleBPos.x, obstacleBPos.y));
 		obstacleC.Render(renderer, Vector2i(obstacleCPos.x, obstacleCPos.y));
@@ -583,6 +622,9 @@ int main()
 
 		// next frame...
 	}
+
+	SDL_DestroyTexture(textTexture);
+	SDL_FreeSurface(textSurface);
 	// Shutting down the renderer
 	SDL_DestroyRenderer(renderer);
 
@@ -599,7 +641,7 @@ int main()
 }
 
 
-void ProcessEvents(SDL_Event* event, bool* done, Character* player, int* PIndex)
+void ProcessEvents(SDL_Event* event, bool* done, Character** player, int* playerIndex, int amountPlayer)
 {
 	if (event->type == SDL_QUIT) // The user wants to quit
 	{
@@ -628,10 +670,12 @@ void ProcessEvents(SDL_Event* event, bool* done, Character* player, int* PIndex)
 		{
 			if (!IsMoving() && isPlayerRound)
 			{
+				while (isPlayerRound && alivePlayerCharactersCount > 0 && player[*playerIndex % amountPlayer]->isDead)
+					*playerIndex++;
 				int x, y;
 				SDL_GetMouseState(&x, &y);
-				player->MoveInit(CastToGridPosition(Vector2i(x, y)));
-				*PIndex += 1;
+				player[*playerIndex % amountPlayer]->MoveInit(CastToGridPosition(Vector2i(x, y)));
+				*playerIndex += 1;
 				isPlayerRound = false;
 			}
 			break;
