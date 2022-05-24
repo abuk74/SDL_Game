@@ -1,5 +1,6 @@
 ﻿#include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #define SDL_MAIN_HANDLED
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
@@ -438,6 +439,7 @@ Vector2i CastToGridPosition(Vector2i mousePosition)
 
 int GetRandomIndex(int value)
 {
+	srand(time(nullptr));
 	int random = rand() % value;
 	return random;
 }
