@@ -1,0 +1,7 @@
+﻿.vs
+FirstGame/x64/Debug/FirstGame.exe
+*.pdb
+/FirstGame/x64
+/FirstGame/FirstGame/x64
+FirstGame/x64
+FirstGame/FirstGame/FirstGame.vcxproj

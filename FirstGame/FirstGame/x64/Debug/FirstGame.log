@@ -1,8 +1,0 @@
-﻿  Main.cpp
-C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(329,107): warning C4244: "argument": konwersja z "float" do "Uint8", możliwa utrata danych
-C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(329,88): warning C4244: "argument": konwersja z "float" do "Uint8", możliwa utrata danych
-C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(329,69): warning C4244: "argument": konwersja z "float" do "Uint8", możliwa utrata danych
-C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(329,50): warning C4244: "argument": konwersja z "float" do "Uint8", możliwa utrata danych
-C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(442,12): warning C4244: "argument": konwersja z "time_t" do "unsigned int", możliwa utrata danych
-C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\FirstGame\Main.cpp(534,18): warning C4244: "inicjowanie": konwersja z "Uint32" do "float", możliwa utrata danych
-  FirstGame.vcxproj -> C:\Users\Kuba\Documents\GitHub\SDL_Game\FirstGame\x64\Debug\FirstGame.exe

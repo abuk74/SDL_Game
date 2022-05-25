@@ -24,6 +24,9 @@ uchar grid[gridHeight][gridWidth];
 const char defaultCharacterSpritePath[] = "image.png";
 const char fontPath[] = "OdibeeSans-Regular.ttf";
 
+const int playerFieldValue = 100;
+const int agantsFieldValue = 200;
+
 static float deltaTime = 0.0f;
 static bool isMoving[16] = { false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
 static bool isPlayerRound = true;
@@ -210,6 +213,9 @@ struct Character
 	Image image;
 	Vector2i position;
 	Queue path;
+
+	Character* targetEnemy = NULL;
+
 	int characterIndex;
 	float health;
 	float damage;
@@ -221,6 +227,8 @@ struct Character
 	void Move();
 	void MoveInit(Vector2i destination);
 	void MarkAsObstacle(bool value);
+	void MarkAsDead();
+	void Resurect();
 	void TakeDamage(float damge);
 	void Die();
 
@@ -262,7 +270,17 @@ void Character::Move()
 {
 	if (isDead)
 		return;
-	if (!path.IsEmpty())
+	if (!path.IsEmpty() && targetEnemy != NULL) 
+	{
+		Vector2i temPos = path.FirstNode->position;
+		if (grid[temPos.y][temPos.x] == 200) 
+		{
+			isMoving[characterIndex] = false;
+			targetEnemy->TakeDamage(CalculateDamage(this, AI));
+		}
+
+	}
+	else if (!path.IsEmpty())
 	{
 		MarkAsObstacle(false);
 		position = path.FirstNode->position;
@@ -279,14 +297,35 @@ void Character::Move()
 
 void Character::MarkAsObstacle(bool isObstacle)
 {
+	int value = playerFieldValue;
+	if (AI)
+		value = agantsFieldValue;
+
 	if (isObstacle)
 	{
-		grid[position.y][position.x] = 255;
+		grid[position.y][position.x] = value;
 	}
 	else
 	{
 		grid[position.y][position.x] = 0;
 	}
+}
+
+void Character::MarkAsDead() 
+{
+	isDead = true;
+	//TODO: podmienić teksturkę
+	grid[position.y][position.x] = 255;
+}
+
+void Character::Resurect() 
+{
+	isDead = false;
+	//TODO: podmienić teksturkę
+	int value = playerFieldValue;
+	if (AI)
+		value = agantsFieldValue;
+	grid[position.y][position.x] = value;
 }
 
 void Character::TakeDamage(float damage) 
@@ -382,7 +421,7 @@ Queue GetPathGrassfire(Vector2i startPos, Vector2i endPos)
 		}
 	}
 
-	if (grid[endPos.y][endPos.x] == 255)
+	if (grid[endPos.y][endPos.x] == 255 || (grid[endPos.y][endPos.x] == playerFieldValue && isPlayerRound)) //field is marked as obstacle or player wants attack own character
 		return path;
 
 	gridCopy[endPos.y][endPos.x]++;
@@ -409,7 +448,7 @@ Queue GetPathGrassfire(Vector2i startPos, Vector2i endPos)
 						gridCopy[neighbour.y][neighbour.x] = next_value;
 					}
 					else if (neighbour.y > 0 && neighbour.y < gridHeight && neighbour.x > 0 && neighbour.x < gridWidth &&
-						gridCopy[neighbour.y][neighbour.x] == grid[neighbour.y][(int)neighbour.x] && gridCopy[neighbour.y][neighbour.x] != 255)
+						gridCopy[neighbour.y][neighbour.x] == grid[neighbour.y][(int)neighbour.x] && gridCopy[neighbour.y][neighbour.x] != 255 && gridCopy[neighbour.y][neighbour.x] != 200 && gridCopy[neighbour.y][neighbour.x] != 100)
 					{
 						searchQueue.AddNode(neighbour); // add point to check-list 
 						gridCopy[neighbour.y][neighbour.x] = next_value;
@@ -484,9 +523,11 @@ bool IsMoving()
 	return false;
 }
 
-float CalculateDamage(Character* character, int characterCount) 
+float CalculateDamage(Character* character, bool AI) 
 {
-	return character->damage * characterCount;
+	if(AI)
+		return character->damage * aliveAgentsCount;
+	return character->damage * alivePlayerCharactersCount;
 }
 
 int main()
@@ -602,15 +643,15 @@ int main()
 			agents[i]->Render(renderer);
 		}
 
-		textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
-		textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-		SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
-		SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+		//textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
+		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+		//SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
+		//SDL_RenderCopy(renderer, textTexture, NULL, &dest);
 
-		textSurface = TTF_RenderText_Solid(font, "Alive Agents: ", { 255, 255, 255 });
-		textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-		dest = { 1600, 0, textSurface->w, textSurface->h };
-		SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+		//textSurface = TTF_RenderText_Solid(font, "Alive Agents: ", { 255, 255, 255 });
+		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+		//dest = { 1600, 0, textSurface->w, textSurface->h };
+		//SDL_RenderCopy(renderer, textTexture, NULL, &dest);
 
 		obstacleA.Render(renderer, Vector2i(obstacleAPos.x, obstacleAPos.y));
 		obstacleB.Render(renderer, Vector2i(obstacleBPos.x, obstacleBPos.y));
@@ -671,7 +712,7 @@ void ProcessEvents(SDL_Event* event, bool* done, Character** player, int* player
 			if (!IsMoving() && isPlayerRound)
 			{
 				while (isPlayerRound && alivePlayerCharactersCount > 0 && player[*playerIndex % amountPlayer]->isDead)
-					*playerIndex++;
+					*playerIndex += 1;
 				int x, y;
 				SDL_GetMouseState(&x, &y);
 				player[*playerIndex % amountPlayer]->MoveInit(CastToGridPosition(Vector2i(x, y)));
