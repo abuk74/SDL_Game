@@ -23,6 +23,8 @@ uchar grid[gridHeight][gridWidth];
 
 const char defaultCharacterSpritePath[] = "image.png";
 const char fontPath[] = "OdibeeSans-Regular.ttf";
+const char playerDeadPath[] = "x1.png";
+const char agentDeadPath[] = "x2.png";
 
 const int playerFieldValue = 100;
 const int agantsFieldValue = 200;
@@ -35,7 +37,10 @@ static int roundIndex = 0;
 static int alivePlayerCharactersCount = 8;
 static int aliveAgentsCount = 8;
 
+SDL_Renderer* renderer;
 
+Character** playerCharactersPointer;
+Character** agentsPointer;
 
 #pragma region Vectors
 
@@ -206,6 +211,62 @@ bool Queue::IsEmpty()
 
 #pragma endregion
 
+#pragma region UI
+struct UI
+{
+	Image image;
+	SDL_Color color;
+	TTF_Font* font;
+	Vector2i position;
+
+	UI(SDL_Texture* tex, Vector2i size, Vector2i pos);
+	void InitText(SDL_Renderer* renderer, TTF_Font* font_, SDL_Color color_, const char* text_);
+	void RenderText(SDL_Renderer* renderer, Vector2i pos);
+	void SetNewText(SDL_Renderer* renderer, const char* text_);
+
+};
+UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos)
+	:image(tex, size), position(pos.x, pos.y)
+{
+	InitText(renderer, TTF_OpenFont(fontPath, fontSize), { 255, 255, 255 }, "NaN");
+}
+void UI::InitText(SDL_Renderer* renderer,TTF_Font* font_, SDL_Color color_, const char* text_)
+{
+	font = font_;
+	color = color_;
+
+	SDL_Surface* text = TTF_RenderText_Solid(font_, text_, color_);
+	if (!text)
+	{
+		printf("Failed to render text: %s", TTF_GetError());
+		return;
+	}
+
+	image = Image(SDL_CreateTextureFromSurface(renderer, text), Vector2i(text->w , text->h));
+
+	SDL_FreeSurface(text);
+
+}
+//textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
+		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+		//SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
+		//SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+void UI::RenderText(SDL_Renderer* renderer, Vector2i pos)
+{
+	position = Vector2i(((pos.x + 1.0f) * 128) / image.textureSize.x, ((pos.y + 1.0f) * 98) / image.textureSize.y); //Vector2i(pos.x * 128, pos.y * 98); //
+	image.Render(renderer, position);
+}
+void UI::SetNewText(SDL_Renderer* renderer,const char* text_)
+{
+	SDL_Surface* surface = TTF_RenderText_Solid(font, text_, color);
+
+	image.texture = SDL_CreateTextureFromSurface(renderer, surface);
+
+	SDL_FreeSurface(surface);
+}
+#pragma endregion
+
+
 #pragma region Character
 
 struct Character
@@ -213,16 +274,18 @@ struct Character
 	Image image;
 	Vector2i position;
 	Queue path;
-
-	Character* targetEnemy = NULL;
+	UI ui;
 
 	int characterIndex;
+	float totalHealth;
 	float health;
 	float damage;
 	bool isDead = false;
 	bool AI = false;
+	int entityCount = 1;
 
-	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex, float health, float damage, bool isAgent);
+
+	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex, float health, float damage, bool isAgent, int entityCount);
 	void Render(SDL_Renderer* renderer);
 	void Move();
 	void MoveInit(Vector2i destination);
@@ -235,11 +298,13 @@ struct Character
 	~Character();
 };
 
-Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, float startHealth, float baseDamage,  bool isAgent)
-	:image(tex, size), position(pos.x, pos.y)
+Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, float startHealth, float baseDamage,  bool isAgent, int entityCount)
+	:image(tex, size), position(pos.x, pos.y), ui(tex, size, pos)
 {
 	characterIndex = id;
 	health = startHealth;
+	this->entityCount = entityCount;
+	totalHealth = health * entityCount;
 	damage = baseDamage;
 	AI = isAgent;
 	MarkAsObstacle(true);
@@ -248,6 +313,7 @@ Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, floa
 void Character::Render(SDL_Renderer* renderer)
 {
 	image.Render(renderer, position);
+	ui.RenderText(renderer, position);
 }
 
 void DrawMap(uchar arr[][15])
@@ -270,20 +336,26 @@ void Character::Move()
 {
 	if (isDead)
 		return;
-	if (!path.IsEmpty() && targetEnemy != NULL) 
+	if (!path.IsEmpty())
 	{
+		int value = agantsFieldValue;
+		if (AI)
+			value = playerFieldValue;
 		Vector2i temPos = path.FirstNode->position;
-		if (grid[temPos.y][temPos.x] == 200) 
+		if (grid[temPos.y][temPos.x] == value) 
 		{
 			isMoving[characterIndex] = false;
-			targetEnemy->TakeDamage(CalculateDamage(this, AI));
+			if(AI)
+				GetTargetReferenceAndTakeDamage(this, temPos, playerCharactersPointer, damage, entityCount);
+			else
+				GetTargetReferenceAndTakeDamage(this, temPos, agentsPointer, damage, entityCount);
+			path.DeleteFirstNode();
+			MarkAsObstacle(true);
+			Sleep(150);
+			return;
 		}
-
-	}
-	else if (!path.IsEmpty())
-	{
 		MarkAsObstacle(false);
-		position = path.FirstNode->position;
+		position = temPos; //path.FirstNode->position;
 		path.DeleteFirstNode();
 		isMoving[characterIndex] = true;
 		Sleep(150);
@@ -315,6 +387,7 @@ void Character::MarkAsDead()
 {
 	isDead = true;
 	//TODO: podmienić teksturkę
+	image.texture = SDL_CreateTextureFromSurface(renderer, IMG_Load(playerDeadPath));
 	grid[position.y][position.x] = 255;
 }
 
@@ -322,24 +395,37 @@ void Character::Resurect()
 {
 	isDead = false;
 	//TODO: podmienić teksturkę
+	image.texture = SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath));
 	int value = playerFieldValue;
 	if (AI)
 		value = agantsFieldValue;
 	grid[position.y][position.x] = value;
 }
 
-void Character::TakeDamage(float damage) 
+void Character::TakeDamage(float damageValue) 
 {
 	if (isDead)
 		return;
-	float tempHealth = health - damage;
-	if (health <= 0.0f)
-		this->Die();
+	//float tempHealth = health - damage;
+	totalHealth = totalHealth - damageValue;
+
+	int killedEntity = (int)(damageValue / health);
+	entityCount -= killedEntity;
+	if (entityCount * health > totalHealth)
+		entityCount--;
+
+
+	if (totalHealth <= 0.0f || entityCount <= 0) 
+	{
+		//printf("Die KURWA!");
+		MarkAsDead();
+		Die();
+	}
+
 }
 
 void Character::Die() 
 {
-	isDead = true;
 	if (AI)
 		aliveAgentsCount--;
 	else
@@ -505,12 +591,29 @@ Vector2i GetRandomGrid()
 {
 	int randomX = GetRandomIndex(gridWidth);
 	int randomY = GetRandomIndex(gridHeight);
-	while (grid[randomY][randomX] == 255)
+	while (grid[randomY][randomX] == 255 || grid[randomY][randomX] == 100 || grid[randomY][randomX] == 200)
 	{
 		randomX = GetRandomIndex(gridWidth);
 		randomY = GetRandomIndex(gridHeight);
 	}
 	return Vector2i(randomX, randomY);
+}
+
+void GetTargetReferenceAndTakeDamage(Character* invoker, Vector2i position, Character** characters, float damage, int count) 
+{
+	int i;
+	for (i = 0; i < 8; i++)
+	{
+		if (characters[i]->position.x == position.x && characters[i]->position.y == position.y) 
+		{
+			characters[i]->TakeDamage(damage * count);
+			break;
+		}
+	}
+	if (!characters[i]->isDead) 
+	{
+		invoker->TakeDamage(characters[i]->damage * characters[i]->entityCount);
+	}
 }
 
 bool IsMoving()
@@ -523,19 +626,19 @@ bool IsMoving()
 	return false;
 }
 
-float CalculateDamage(Character* character, bool AI) 
-{
-	if(AI)
-		return character->damage * aliveAgentsCount;
-	return character->damage * alivePlayerCharactersCount;
-}
+//float CalculateDamage(float characterDamege, bool AI) 
+//{
+	//if(AI)
+		//return characterDamege * aliveAgentsCount;
+	//return characterDamege * alivePlayerCharactersCount;
+//}
 
 int main()
 {
 	Vector4 backgroundColor = Vector4(3, 34, 48, 255);
 
 	SDL_Window* window = GetWindow();
-	SDL_Renderer* renderer = GetRenderer(window);
+	renderer = GetRenderer(window);
 	SDL_Texture* textTexture;
 	SDL_Surface* textSurface;
 	TTF_Font* font = GetFont();
@@ -548,23 +651,23 @@ int main()
 
 	Vector2i screenSize(screenWidth / gridWidth, screenHight / gridHeight);
 
-	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0, 10.0f, 5.0f, false);
-	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1, 10.0f, 5.0f, false);
-	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2, 10.0f, 5.0f, false);
-	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3, 10.0f, 5.0f, false);
-	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4, 10.0f, 5.0f, false);
-	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5, 10.0f, 5.0f, false);
-	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6, 10.0f, 5.0f, false);
-	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7, 10.0f, 5.0f, false);
+	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0, 10.0f, 5.0f, false, 5);
+	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1, 10.0f, 5.0f, false, 5);
+	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2, 10.0f, 5.0f, false, 5);
+	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3, 10.0f, 5.0f, false, 5);
+	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4, 10.0f, 5.0f, false, 4);
+	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5, 10.0f, 5.0f, false, 4);
+	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6, 10.0f, 5.0f, false, 4);
+	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7, 10.0f, 5.0f, false, 4);
 
-	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 2), 8, 10.0f, 3.0f, true);
-	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 3), 9, 10.0f, 3.0f, true);
-	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 4), 10, 10.0f, 3.0f, true);
-	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 5), 11, 10.0f, 3.0f, true);
-	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 6), 12, 10.0f, 3.0f, true);
-	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 7), 13, 10.0f, 3.0f, true);
-	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 8), 14, 10.0f, 3.0f, true);
-	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(14, 9), 15, 10.0f, 3.0f, true);
+	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 2), 8, 10.0f, 3.0f, true, 4);
+	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 3), 9, 10.0f, 3.0f, true, 4);
+	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 4), 10, 10.0f, 3.0f, true, 4);
+	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 5), 11, 10.0f, 3.0f, true, 4);
+	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 6), 12, 10.0f, 3.0f, true, 5);
+	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 7), 13, 10.0f, 3.0f, true, 5);
+	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 8), 14, 10.0f, 3.0f, true, 5);
+	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 9), 15, 10.0f, 3.0f, true, 5);
 
 	int amountPlayer = 8;
 	int amountAI = 8;
@@ -573,6 +676,9 @@ int main()
 
 	Character* playerChampions[8] = { &championA, &championB , &championC ,&championD ,&championE ,&championF ,&championG ,&championH };
 	Character* agents[8] = { &championAIA, &championAIB ,&championAIC ,&championAID ,&championAIE ,&championAIF ,&championAIG, &championAIH };
+
+	playerCharactersPointer = playerChampions;
+	agentsPointer = agents;
 
 
 	Image obstacleA = Image(SDL_CreateTextureFromSurface(renderer, IMG_Load("obstacle.png")), screenSize);
@@ -625,7 +731,18 @@ int main()
 			while (aliveAgentsCount > 0 && agents[AIIndex % amountAI]->isDead)
 				AIIndex++;
 
-			Vector2i dest = GetRandomGrid();
+			//TODO: randomowy indeks w characterach gracza, sprawdź czy nie jest martwy, weź jego pozycje i wywołaj Grassfire
+			Vector2i dest(10, 10);
+			if (GetRandomIndex(10) > 5) //Get Random Position Behavior
+			{
+				dest = GetRandomGrid();
+			}
+			else //Attack Behavior
+			{
+				int index = GetRandomIndex(8);
+				dest = playerChampions[index]->position;
+			}
+
 			agents[AIIndex % amountAI]->MoveInit(dest);
 			AIIndex++;
 			isPlayerRound = true;
