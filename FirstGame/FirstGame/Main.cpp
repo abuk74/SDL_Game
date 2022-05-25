@@ -226,9 +226,9 @@ struct UI
 
 };
 UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font)
-	:image(tex, size), position(pos.x, pos.y)
+	:image(tex, size), position(pos)
 {
-	InitText(renderer, font, { 255, 255, 255 }, "NaN");
+	InitText(renderer, font, { 255, 255, 255 }, "O chuj chodzi?");
 }
 void UI::InitText(SDL_Renderer* renderer,TTF_Font* font_, SDL_Color color_, const char* text_)
 {
@@ -255,6 +255,7 @@ void UI::RenderText(SDL_Renderer* renderer, Vector2i pos)
 {
 	position = Vector2i(((pos.x + 1.0f) * 128) / image.textureSize.x, ((pos.y + 1.0f) * 98) / image.textureSize.y); //Vector2i(pos.x * 128, pos.y * 98); //
 	image.Render(renderer, position);
+	//SDL_RenderCopy(renderer, image.texture, NULL, NULL);
 }
 void UI::SetNewText(SDL_Renderer* renderer,const char* text_)
 {
@@ -763,8 +764,8 @@ int main()
 
 		//textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
 		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-		//SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
-		//SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+		SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
+		SDL_RenderCopy(renderer, textTexture, NULL, &dest);
 
 		//textSurface = TTF_RenderText_Solid(font, "Alive Agents: ", { 255, 255, 255 });
 		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
