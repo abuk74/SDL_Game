@@ -219,16 +219,16 @@ struct UI
 	TTF_Font* font;
 	Vector2i position;
 
-	UI(SDL_Texture* tex, Vector2i size, Vector2i pos);
+	UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font);
 	void InitText(SDL_Renderer* renderer, TTF_Font* font_, SDL_Color color_, const char* text_);
 	void RenderText(SDL_Renderer* renderer, Vector2i pos);
 	void SetNewText(SDL_Renderer* renderer, const char* text_);
 
 };
-UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos)
+UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font)
 	:image(tex, size), position(pos.x, pos.y)
 {
-	InitText(renderer, TTF_OpenFont(fontPath, fontSize), { 255, 255, 255 }, "NaN");
+	InitText(renderer, font, { 255, 255, 255 }, "NaN");
 }
 void UI::InitText(SDL_Renderer* renderer,TTF_Font* font_, SDL_Color color_, const char* text_)
 {
@@ -285,7 +285,7 @@ struct Character
 	int entityCount = 1;
 
 
-	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex, float health, float damage, bool isAgent, int entityCount);
+	Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int characterIndex, float health, float damage, bool isAgent, int entityCount, SDL_Texture* fontText, Vector2i fontSurfaceSize, TTF_Font* font);
 	void Render(SDL_Renderer* renderer);
 	void Move();
 	void MoveInit(Vector2i destination);
@@ -298,8 +298,8 @@ struct Character
 	~Character();
 };
 
-Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, float startHealth, float baseDamage,  bool isAgent, int entityCount)
-	:image(tex, size), position(pos.x, pos.y), ui(tex, size, pos)
+Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, float startHealth, float baseDamage,  bool isAgent, int entityCount, SDL_Texture* fontText, Vector2i fontSurfaceSize, TTF_Font* font)
+	:image(tex, size), position(pos.x, pos.y), ui(fontText, fontSurfaceSize, pos, font)
 {
 	characterIndex = id;
 	health = startHealth;
@@ -647,27 +647,28 @@ int main()
 		return -1;
 
 	textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
+	Vector2i textSizeS = Vector2i(textSurface->w, textSurface->h);
 	textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
 
 	Vector2i screenSize(screenWidth / gridWidth, screenHight / gridHeight);
 
-	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0, 10.0f, 5.0f, false, 5);
-	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1, 10.0f, 5.0f, false, 5);
-	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2, 10.0f, 5.0f, false, 5);
-	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3, 10.0f, 5.0f, false, 5);
-	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4, 10.0f, 5.0f, false, 4);
-	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5, 10.0f, 5.0f, false, 4);
-	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6, 10.0f, 5.0f, false, 4);
-	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7, 10.0f, 5.0f, false, 4);
+	Character championA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 3), 0, 10.0f, 5.0f, false, 5, textTexture, textSizeS, font);
+	Character championB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 4), 1, 10.0f, 5.0f, false, 5, textTexture, textSizeS, font);
+	Character championC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 5), 2, 10.0f, 5.0f, false, 5, textTexture, textSizeS, font);
+	Character championD = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 6), 3, 10.0f, 5.0f, false, 5, textTexture, textSizeS, font);
+	Character championE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 7), 4, 10.0f, 5.0f, false, 4, textTexture, textSizeS, font);
+	Character championF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 8), 5, 10.0f, 5.0f, false, 4, textTexture, textSizeS, font);
+	Character championG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 9), 6, 10.0f, 5.0f, false, 4, textTexture, textSizeS, font);
+	Character championH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load(defaultCharacterSpritePath)), screenSize, Vector2i(0, 10), 7, 10.0f, 5.0f, false, 4, textTexture, textSizeS, font);
 
-	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 2), 8, 10.0f, 3.0f, true, 4);
-	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 3), 9, 10.0f, 3.0f, true, 4);
-	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 4), 10, 10.0f, 3.0f, true, 4);
-	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 5), 11, 10.0f, 3.0f, true, 4);
-	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 6), 12, 10.0f, 3.0f, true, 5);
-	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 7), 13, 10.0f, 3.0f, true, 5);
-	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 8), 14, 10.0f, 3.0f, true, 5);
-	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 9), 15, 10.0f, 3.0f, true, 5);
+	Character championAIA = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 2), 8, 10.0f, 3.0f, true, 4, textTexture, textSizeS, font);
+	Character championAIB = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 3), 9, 10.0f, 3.0f, true, 4, textTexture, textSizeS, font);
+	Character championAIC = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 4), 10, 10.0f, 3.0f, true, 4, textTexture, textSizeS, font);
+	Character championAID = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 5), 11, 10.0f, 3.0f, true, 4, textTexture, textSizeS, font);
+	Character championAIE = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 6), 12, 10.0f, 3.0f, true, 5, textTexture, textSizeS, font);
+	Character championAIF = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 7), 13, 10.0f, 3.0f, true, 5, textTexture, textSizeS, font);
+	Character championAIG = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 8), 14, 10.0f, 3.0f, true, 5, textTexture, textSizeS, font);
+	Character championAIH = Character(SDL_CreateTextureFromSurface(renderer, IMG_Load("space-game.png")), screenSize, Vector2i(14, 9), 15, 10.0f, 3.0f, true, 5, textTexture, textSizeS, font);
 
 	int amountPlayer = 8;
 	int amountAI = 8;
