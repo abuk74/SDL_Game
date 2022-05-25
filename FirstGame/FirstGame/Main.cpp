@@ -17,7 +17,7 @@ const int screenHight = 1080;
 const int gridWidth = 15;
 const int gridHeight = 11;
 
-const int fontSize = 42;
+const int fontSize = 12;
 
 uchar grid[gridHeight][gridWidth];
 
@@ -229,6 +229,7 @@ UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font)
 	:image(tex, size), position(pos)
 {
 	InitText(renderer, font, { 255, 255, 255 }, "O chuj chodzi?");
+	SetNewText(renderer, "Dziala");
 }
 void UI::InitText(SDL_Renderer* renderer,TTF_Font* font_, SDL_Color color_, const char* text_)
 {
@@ -764,8 +765,8 @@ int main()
 
 		//textSurface = TTF_RenderText_Solid(font, "Alive Player Champions: ", { 255, 255, 255 });
 		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-		SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
-		SDL_RenderCopy(renderer, textTexture, NULL, &dest);
+		//SDL_Rect dest = { 0, 0, textSurface->w, textSurface->h };
+		//SDL_RenderCopy(renderer, textTexture, NULL, &dest);
 
 		//textSurface = TTF_RenderText_Solid(font, "Alive Agents: ", { 255, 255, 255 });
 		//textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
