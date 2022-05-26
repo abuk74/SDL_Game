@@ -12,3 +12,4 @@ void ProcessEvents(SDL_Event* sdl_event, bool* done, Character** player, int* pl
 Queue GetPathGrassfire(Vector2i start_pos, Vector2i end_pos);
 //float CalculateDamage(float characterDamage, bool AI);
 void GetTargetReferenceAndTakeDamage(Character* invoker, Vector2i position, Character** characters, float damage, int count);
+char* CastToArray(int number);

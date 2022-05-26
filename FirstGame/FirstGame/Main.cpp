@@ -17,7 +17,7 @@ const int screenHight = 1080;
 const int gridWidth = 15;
 const int gridHeight = 11;
 
-const int fontSize = 12;
+const int fontSize = 28;
 
 uchar grid[gridHeight][gridWidth];
 
@@ -219,17 +219,17 @@ struct UI
 	TTF_Font* font;
 	Vector2i position;
 
-	UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font);
+	UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font, int entities);
 	void InitText(SDL_Renderer* renderer, TTF_Font* font_, SDL_Color color_, const char* text_);
 	void RenderText(SDL_Renderer* renderer, Vector2i pos);
 	void SetNewText(SDL_Renderer* renderer, const char* text_);
 
 };
-UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font)
+UI::UI(SDL_Texture* tex, Vector2i size, Vector2i pos, TTF_Font* font, int entities)
 	:image(tex, size), position(pos)
 {
-	InitText(renderer, font, { 255, 255, 255 }, "O chuj chodzi?");
-	SetNewText(renderer, "Dziala");
+	InitText(renderer, font, { 199, 21, 133 }, "Nie dziala");
+	SetNewText(renderer, CastToArray(entities));
 }
 void UI::InitText(SDL_Renderer* renderer,TTF_Font* font_, SDL_Color color_, const char* text_)
 {
@@ -254,7 +254,7 @@ void UI::InitText(SDL_Renderer* renderer,TTF_Font* font_, SDL_Color color_, cons
 		//SDL_RenderCopy(renderer, textTexture, NULL, &dest);
 void UI::RenderText(SDL_Renderer* renderer, Vector2i pos)
 {
-	position = Vector2i(((pos.x + 1.0f) * 128) / image.textureSize.x, ((pos.y + 1.0f) * 98) / image.textureSize.y); //Vector2i(pos.x * 128, pos.y * 98); //
+	position = Vector2i(((pos.x + 1.0f) * 128 / image.textureSize.x) - 1, ((pos.y + 1.0f) * 98 / image.textureSize.y) - 1);
 	image.Render(renderer, position);
 	//SDL_RenderCopy(renderer, image.texture, NULL, NULL);
 }
@@ -301,7 +301,7 @@ struct Character
 };
 
 Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, float startHealth, float baseDamage,  bool isAgent, int entityCount, SDL_Texture* fontText, Vector2i fontSurfaceSize, TTF_Font* font)
-	:image(tex, size), position(pos.x, pos.y), ui(fontText, fontSurfaceSize, pos, font)
+	:image(tex, size), position(pos.x, pos.y), ui(fontText, fontSurfaceSize, pos, font, entityCount)
 {
 	characterIndex = id;
 	health = startHealth;
@@ -315,7 +315,8 @@ Character::Character(SDL_Texture* tex, Vector2i size, Vector2i pos, int id, floa
 void Character::Render(SDL_Renderer* renderer)
 {
 	image.Render(renderer, position);
-	ui.RenderText(renderer, position);
+	if(!isDead)
+		ui.RenderText(renderer, position);
 }
 
 void DrawMap(uchar arr[][15])
@@ -416,6 +417,8 @@ void Character::TakeDamage(float damageValue)
 	if (entityCount * health > totalHealth)
 		entityCount--;
 
+	if(entityCount > 0)
+		ui.SetNewText(renderer, CastToArray(entityCount));
 
 	if (totalHealth <= 0.0f || entityCount <= 0) 
 	{
@@ -634,6 +637,20 @@ bool IsMoving()
 		//return characterDamege * aliveAgentsCount;
 	//return characterDamege * alivePlayerCharactersCount;
 //}
+
+char* CastToArray(int number)
+{
+	int n = log10(number) + 1;
+	int i;
+	char* numberArray = (char*)calloc(n, sizeof(char));
+	numberArray[n] = '\0';
+	for (i = n - 1; i >= 0; --i, number /= 10)
+	{
+		numberArray[i] = (number % 10) + '0';
+	}
+
+	return numberArray;
+}
 
 int main()
 {
